@@ -9,3 +9,8 @@ sympy
 openpyxl
 setuptools==59.5.0
 numpy==1.24.4
+timm
+torch_geometric
+pynvml
+setproctitle
+pymetis
