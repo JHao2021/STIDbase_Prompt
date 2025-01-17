@@ -449,8 +449,8 @@ class BaseTimeSeriesForecastingRunner(BaseRunner):
 
         if self.cl_param:
             cl_length = self.curriculum_learning(epoch=epoch)
-            forward_return['prediction'] = forward_return['prediction'][:, :cl_length, :]
-            forward_return['target'] = forward_return['target'][:, :cl_length, :]
+            forward_return['prediction'] = forward_return['prediction'][:, :cl_length, :, :]
+            forward_return['target'] = forward_return['target'][:, :cl_length, :, :]
         loss = self.metric_forward(self.loss, forward_return)
 
         for metric_name, metric_func in self.metrics.items():
@@ -483,8 +483,8 @@ class BaseTimeSeriesForecastingRunner(BaseRunner):
 
         metrics_results = {}
         for i in self.evaluation_horizons:
-            pred = returns_all['prediction'][:, i, :]
-            real = returns_all['target'][:, i, :]
+            pred = returns_all['prediction'][:, i, :, :]
+            real = returns_all['target'][:, i, :, :]
 
             metrics_results[f'horizon_{i + 1}'] = {}
             metric_repr = ''

@@ -84,7 +84,7 @@ MODEL_PARAM = {
     "finetune": 0,
 
 
-    "t_patch_size": 4,
+    "t_patch_size": 1,
     "his_len": INPUT_LEN,
     "pred_len": OUTPUT_LEN,
     "used_data": "GridGraphall",

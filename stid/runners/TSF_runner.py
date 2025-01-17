@@ -84,6 +84,10 @@ class TimeSpaceForecastingRunner(BaseTimeSeriesForecastingRunner):
         future_data = self.to_running_device(future_data)    # Shape: [B, L, N, C]
         edges = self.to_running_device(edges)
         
+
+        subgraphs = []
+        subgraphs.append(torch.arange(0, topo.size(0)))
+
         batch_size, length, num_nodes, _ = future_data.shape
 
         # Select input features
@@ -108,7 +112,7 @@ class TimeSpaceForecastingRunner(BaseTimeSeriesForecastingRunner):
             seed=520,  
             mode='backward',  
             patch_size=1,  
-            subgraphs=edges,
+            subgraphs=subgraphs,
             **kwargs  
         )
 
@@ -118,11 +122,11 @@ class TimeSpaceForecastingRunner(BaseTimeSeriesForecastingRunner):
         if 'inputs' not in model_return:
             model_return['inputs'] = self.select_target_features(history_data)
         if 'target' not in model_return:
-            # model_return['target'] = self.select_target_features(future_data)
-            model_return['target'] = model_target
+            model_return['target'] = self.select_target_features(future_data)
+            # model_return['target'] = model_target
 
         # Ensure the output shape is correct
-        # assert list(model_return['prediction'].shape)[:3] == [batch_size, length, num_nodes], \
-        #     "The shape of the output is incorrect. Ensure it matches [B, L, N, C]."
+        assert list(model_return['prediction'].shape)[:3] == [batch_size, length, num_nodes], \
+            "The shape of the output is incorrect. Ensure it matches [B, L, N, C]."
 
         return model_return
