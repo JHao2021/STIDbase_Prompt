@@ -525,10 +525,10 @@ class UniFlow(nn.Module):
         # else:
         input_size = (T, len(split_nodes), 1)
 
-        pos_embed_sort = self.pos_embed_enc(ids_keep, N, input_size)
-        assert x.shape == pos_embed_sort.shape
-
-        x_attn = x + pos_embed_sort
+        # pos_embed_sort = self.pos_embed_enc(ids_keep, N, input_size)
+        # assert x.shape == pos_embed_sort.shape
+        # x_attn = x + pos_embed_sort
+        x_attn = x
         
         prompt_save = {}
         attn_bias = {}
@@ -630,15 +630,20 @@ class UniFlow(nn.Module):
 
         x = causal_restore(x, ids_restore, N, T, H,  W, C, self.mask_token)
 
-        decoder_pos_embed = self.pos_embed_dec(ids_restore, N, input_size)
+        # decoder_pos_embed = self.pos_embed_dec(ids_restore, N, input_size)
 
         # add pos embed
-        assert x.shape == decoder_pos_embed.shape #== TimeEmb.shape
+        # assert x.shape == decoder_pos_embed.shape #== TimeEmb.shape
 
-        if self.args.is_time_emb==1:
-            x_attn = x + decoder_pos_embed #+ TimeEmb
+        # if self.args.is_time_emb==1:
+        #     x_attn = x + decoder_pos_embed + TimeEmb
+        # else:
+        #     x_attn = x + decoder_pos_embed
+
+        if self.args.is_time_emb == 1:
+            x_attn = x + TimeEmb
         else:
-            x_attn = x + decoder_pos_embed
+            x_attn = x 
 
         attn_bias = prompt_graph
         
