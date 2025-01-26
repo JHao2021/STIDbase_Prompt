@@ -107,7 +107,7 @@ class TimeSpaceForecastingRunner(BaseTimeSeriesForecastingRunner):
             train=train,
             topo=edges,  
             data_name=data_name,  
-            mask_ratio=0.5,  
+            mask_ratio=0,  
             mask_strategy='causal',  
             seed=520,  
             mode='backward',  
