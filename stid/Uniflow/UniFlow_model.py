@@ -499,125 +499,21 @@ class UniFlow(nn.Module):
         # embed patches
         N, _, T, H, W = x.shape
 
-        origin_x = x.clone()
-
-        # topo 其实就是 图结构，边
         edges = prompt['topo']
 
-        # 进行 Spatio-Temporal Patching
         TimeEmb = None
-        # if 'Graph' not in data:
-        #     x, TimeEmb = self.Embedding_patch(x, x_mark, edges, is_time = self.args.is_time_emb, patch_size=patch_size, hour_num = data)
-        # else:
-        # 将 [B, T, N, C] 的维度改变为 [B, L, C] 
+
         x, TimeEmb = self.Embedding_patch_graph(x, x_mark, edges, split_nodes, is_time = self.args.is_time_emb, patch_size=patch_size, hour_num = data)
         
-        _, L, C = x.shape
 
         T = T // self.args.t_patch_size
 
-        assert mode in ['backward','forward']
-
         x, mask, ids_restore, ids_keep = causal_masking(x, mask_ratio, T=T, mask_strategy=mask_strategy)
 
-        # if 'Graph' not in data:
-        #     input_size = (T, H//patch_size, W//patch_size)
-        # else:
         input_size = (T, len(split_nodes), 1)
 
-        # pos_embed_sort = self.pos_embed_enc(ids_keep, N, input_size)
-        # assert x.shape == pos_embed_sort.shape
-        # x_attn = x + pos_embed_sort
-        x_attn = x
-        
-        prompt_save = {}
-        attn_bias = {}
-
-        if self.args.is_prompt==1 and 'graph' in self.args.prompt_content:
-            '''
-            # Temporal
-            此时prompt已经是 Et = SELFATTENTION(Sh),Ef = FFT(Sh) 了，下面部分是在进行Et和Ef的retrieval
-            '''
-            prompt_t = self.enc_memory_t(prompt['t'].reshape(-1,prompt['t'].shape[-1]))
-            prompt_t = prompt_t['out'].reshape(prompt['t'].shape)
-
-            prompt_f = self.enc_memory_f(prompt['f'].reshape(-1,prompt['f'].shape[-1]))
-            prompt_f = prompt_f['out'].reshape(prompt['f'].shape)
-
-            '''
-            # Spatial
-            '''
-            adp_t = F.softmax(F.relu(prompt_t @ prompt_t.transpose(1, 2)), dim=-1) # N * (H*W) * (H*W)
-            adp_f = F.softmax(F.relu(prompt_f @ prompt_f.transpose(1, 2)), dim=-1)
-
-            data_list_t = []
-            data_list_f = []
-            edge_att_t, edge_att_f = [], []
-            for i in range(adp_t.size(0)):
-                edge_index_t = adp_t[i].nonzero().t().contiguous() + i * adp_t.shape[1]
-                data_list_t.append(edge_index_t)
-                edge_att_t.append(adp_t[i][adp_t[i]!=0])
-
-                edge_index_f = adp_f[i].nonzero().t().contiguous() + i * adp_f.shape[1]
-                data_list_f.append(edge_index_f)
-                edge_att_f.append(adp_f[i][adp_f[i]!=0])
-
-            edge_t = torch.cat(data_list_t, dim=-1)
-            edge_att_t = torch.cat(edge_att_t, dim=0)
-            edge_f = torch.cat(data_list_f, dim=-1)
-            edge_att_f = torch.cat(edge_att_f, dim=0)
-
-            '''
-            Est = GCN(Et, At), Esf = GCN(Ef, Af)
-            '''
-            # if 'Graph' not in data:
-            #     prompt_t = self.gcn_t(prompt_t.reshape(-1,prompt_t.shape[-1]), edge_t, edge_att_t).reshape(N, H*W//patch_size**2, self.embed_dim)
-            #     prompt_f = self.gcn_f(prompt_f.reshape(-1,prompt_f.shape[-1]), edge_f, edge_att_f).reshape(N, H*W//patch_size**2, self.embed_dim)
-
-            # else:
-            prompt_t = self.gcn_topo_t(prompt_t.reshape(-1,prompt_t.shape[-1]), edge_t, edge_att_t).reshape(N, len(split_nodes), self.embed_dim)
-            prompt_f = self.gcn_topo_f(prompt_f.reshape(-1,prompt_f.shape[-1]), edge_f, edge_att_f).reshape(N, len(split_nodes), self.embed_dim)
-
-            prompt_t = prompt_t.unsqueeze(1).repeat(1, self.args.his_len//self.args.t_patch_size, 1,1).reshape(N, x_attn.shape[1], self.embed_dim)
-            prompt_f = prompt_f.unsqueeze(1).repeat(1, self.args.his_len//self.args.t_patch_size, 1,1).reshape(N, x_attn.shape[1], self.embed_dim)
-
-            assert prompt_t.shape == prompt_f.shape == x_attn.shape
-
-
-            '''
-            t f 表示时间部分的prompt
-            '''
-            prompt_save['t'] = prompt_t.clone()
-            prompt_save['f'] = prompt_f.clone()
-
-
-        if self.args.is_prompt==1 and 'node' in self.args.prompt_content:
-            '''
-            # Spatial
-            进行Est和Esf的retrieval
-            '''
-            prompt_t = self.enc_memory_t(prompt['t'].reshape(-1,prompt['t'].shape[-1]))
-            prompt_t = prompt_t['out'].reshape(prompt['t'].shape)
-
-            prompt_f = self.enc_memory_f(prompt['f'].reshape(-1,prompt['f'].shape[-1]))
-            prompt_f = prompt_f['out'].reshape(prompt['f'].shape)
-
-            prompt_t = prompt_t.unsqueeze(1).repeat(1, self.args.his_len//self.args.t_patch_size, 1,1).reshape(N, x_attn.shape[1], self.embed_dim)
-            prompt_f = prompt_f.unsqueeze(1).repeat(1, self.args.his_len//self.args.t_patch_size, 1,1).reshape(N, x_attn.shape[1], self.embed_dim)
-
-            assert prompt_t.shape == prompt_f.shape == x_attn.shape
-
-            '''
-            node_t node_f 表示空间部分的prompt
-            '''
-            prompt_save['node_t'] = prompt_t.clone()
-            prompt_save['node_f'] = prompt_f.clone()
-
-        # for index, blk in enumerate(self.blocks):
-        #     x_attn = blk(x_attn, attn_bias = attn_bias)
-            
-                       
-        return x_attn, mask, ids_restore, input_size, TimeEmb,  prompt_save
+     
+        return x, mask, ids_restore, input_size, TimeEmb
 
     def forward_decoder(self, x, x_mark, mask, ids_restore, mask_strategy, TimeEmb, input_size=None,  data=None, prompt_graph = {}):
         N = x.shape[0]
@@ -630,62 +526,10 @@ class UniFlow(nn.Module):
 
         x = causal_restore(x, ids_restore, N, T, H,  W, C, self.mask_token)
 
-        # decoder_pos_embed = self.pos_embed_dec(ids_restore, N, input_size)
-
-        # add pos embed
-        # assert x.shape == decoder_pos_embed.shape #== TimeEmb.shape
-
-        # if self.args.is_time_emb==1:
-        #     x_attn = x + decoder_pos_embed + TimeEmb
-        # else:
-        #     x_attn = x + decoder_pos_embed
-
         if self.args.is_time_emb == 1:
             x_attn = x + TimeEmb
         else:
             x_attn = x 
-
-        attn_bias = prompt_graph
-        
-        if self.args.is_prompt == 1 and 'graph' in self.args.prompt_content:
-            '''
-            #增强部分
-            '''
-            prompt_t, prompt_f = prompt_graph['t'], prompt_graph['f']
-            prompt_t = prompt_t.reshape(N, -1, H*W, prompt_t.shape[-1])[:,:1].repeat(1,(self.args.his_len+self.args.pred_len)//self.args.t_patch_size,1,1).reshape(N, -1, prompt_t.shape[-1])
-            prompt_f = prompt_f.reshape(N, -1, H*W, prompt_f.shape[-1])[:,:1].repeat(1,(self.args.his_len+self.args.pred_len)//self.args.t_patch_size,1,1).reshape(N, -1, prompt_f.shape[-1])
-
-            assert x_attn.shape == prompt_t.shape == prompt_f.shape
-            '''
-            直接加上prompt
-            '''
-            if 'graph_t' in self.args.prompt_content:
-                x_attn = x_attn + prompt_t
-            elif 'graph_f' in self.args.prompt_content:
-                x_attn = x_attn + prompt_f
-            else:
-                x_attn += prompt_f + prompt_t
-
-        if self.args.is_prompt == 1 and 'node' in self.args.prompt_content:
-            prompt_t, prompt_f = prompt_graph['node_t'], prompt_graph['node_f']
-            prompt_t = prompt_t.reshape(N, -1, H*W, prompt_t.shape[-1])[:,:1].repeat(1,(self.args.his_len+self.args.pred_len)//self.args.t_patch_size,1,1).reshape(N, -1, prompt_t.shape[-1])
-            prompt_f = prompt_f.reshape(N, -1, H*W, prompt_f.shape[-1])[:,:1].repeat(1,(self.args.his_len+self.args.pred_len)//self.args.t_patch_size,1,1).reshape(N, -1, prompt_f.shape[-1])
-
-            assert x_attn.shape == prompt_t.shape == prompt_f.shape
-            if 'node_t' in self.args.prompt_content:
-                x_attn = x_attn + prompt_t
-            elif 'node_f' in self.args.prompt_content:
-                x_attn = x_attn + prompt_f
-            else:
-                x_attn += prompt_f + prompt_t
-
-
-        # apply Transformer blocks
-        # for index, blk in enumerate(self.decoder_blocks):
-        #     x_attn = blk(x_attn, attn_bias = attn_bias)
-        # x_attn = self.decoder_norm(x_attn)
-
-
 
         return x_attn
 

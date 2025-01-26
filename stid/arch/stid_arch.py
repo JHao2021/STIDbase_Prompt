@@ -109,17 +109,8 @@ class STID_Prompt(nn.Module):
         imgs_mark[..., 1] = original_hours   
         imgs_mark = imgs_mark.to(torch.int64) 
         
-        if self.args.is_prompt == 1:
-            # if 'Graph' not in data_name:
-            #     img_tmp, img_spec = self.prompt.adpative_graph(imgs, imgs_mark, self.prompt.Embedding_patch, data=data_name, patch_size = patch_size)
-            # else:
-                img_tmp, img_spec = self.prompt.adpative_graph(imgs, imgs_mark, self.prompt.Embedding_patch_graph, data=data_name, node_split = subgraphs, patch_size = patch_size)
-        else:
-            img_tmp = None
-            img_spec = None
 
-        T, H, W = imgs.shape[2:]
-        x_attn, mask, ids_restore, input_size, TimeEmb, prompt = self.prompt.forward_encoder(imgs, imgs_mark, mask_ratio, mask_strategy, seed=seed, data=data_name, mode=mode, prompt = {'t': img_tmp, 'f':img_spec,'topo':topo}, patch_size = patch_size, split_nodes=subgraphs)
+        x_attn, mask, ids_restore, input_size, TimeEmb, prompt = self.prompt.forward_encoder(imgs, imgs_mark, mask_ratio, mask_strategy, seed=seed, data=data_name, mode=mode, prompt = {'t': None, 'f':None,'topo':topo}, patch_size = patch_size, split_nodes=subgraphs)
         # x_attn : [B, L, D]
 
         #============================STID===================================
