@@ -74,8 +74,8 @@ class STID_Prompt(nn.Module):
         if self.args.multi_patch:
             print('multi_patch')
             self.prompt.init_multiple_patch()   
-        if self.args.is_prompt == 1:     
-            self.prompt.init_prompt()
+        # if self.args.is_prompt == 1:     
+        #     self.prompt.init_prompt()
 
     def forward(self, history_data: torch.Tensor, future_data: torch.Tensor, batch_seen: int, epoch: int, train: bool, 
     mask_ratio=0.5, mask_strategy='causal',seed=520, data_name='none',  mode='backward',topo = None, subgraphs = None, patch_size = 100, **kwargs) -> torch.Tensor:
@@ -110,7 +110,10 @@ class STID_Prompt(nn.Module):
         imgs_mark = imgs_mark.to(torch.int64) 
         
 
-        x_attn, mask, ids_restore, input_size, TimeEmb, prompt = self.prompt.forward_encoder(imgs, imgs_mark, mask_ratio, mask_strategy, seed=seed, data=data_name, mode=mode, prompt = {'t': None, 'f':None,'topo':topo}, patch_size = patch_size, split_nodes=subgraphs)
+        img_tmp = None
+        img_spec = None
+
+        x_attn, mask, ids_restore, input_size, TimeEmb = self.prompt.forward_encoder(imgs, imgs_mark, mask_ratio, mask_strategy, seed=seed, data=data_name, mode=mode, prompt = {'t': img_tmp, 'f':img_spec,'topo':topo}, patch_size = patch_size, split_nodes=subgraphs)
         # x_attn : [B, L, D]
 
         #============================STID===================================
@@ -172,7 +175,7 @@ class STID_Prompt(nn.Module):
 
         # =========================================================================
 
-        hidden = self.prompt.forward_decoder(hidden, imgs_mark, mask, ids_restore, mask_strategy, TimeEmb, input_size = input_size, data = data_name, prompt_graph = prompt)  # [N, L, p*p*1]
+        hidden = self.prompt.forward_decoder(hidden, imgs_mark, mask, ids_restore, mask_strategy, TimeEmb, input_size = input_size, data = data_name)  # [N, L, p*p*1]
 
         # regression
         hidden = hidden.permute(0, 2, 1).unsqueeze(-1)
