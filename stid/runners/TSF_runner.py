@@ -47,6 +47,15 @@ class TimeSpaceForecastingRunner(BaseTimeSeriesForecastingRunner):
         data = data[:, :, :, self.target_features]
         return data
 
+    def remove_duplicates(self, topo):
+        cleaned_topo = []
+        for pair in topo:
+            # 提取每个张量的第一个值（因为所有值都相同）
+            first_value = pair[0][0].item()  # 转换为 Python 标量
+            second_value = pair[1][0].item()  # 转换为 Python 标量
+            cleaned_topo.append([first_value, second_value])
+        return torch.tensor(cleaned_topo)
+
     def forward(self, data: Dict, epoch: int = None, iter_num: int = None, train: bool = True, **kwargs) -> Dict:
         """
         Performs the forward pass for training, validation, and testing. 
@@ -68,25 +77,17 @@ class TimeSpaceForecastingRunner(BaseTimeSeriesForecastingRunner):
         """
 
         # Preprocess input data
-        future_data, history_data, topo, data_name = data['target'], data['inputs'], data['topo'], data['data_name']
-        topo = topo[0, ...]
-        
-        # prompt的topo是边，不是邻接矩阵
-        edges = []
-        for i in range(topo.size(0)):
-            for j in range(i + 1, topo.size(1)):  # 只考虑上三角部分以避免重复
-                if topo[i, j] != 0:
-                    edges.append((i, j))
-        edges = torch.tensor(edges)
+        future_data, history_data, topo, data_name, node_num = data['target'], data['inputs'], data['topo'], data['data_name'], data['node_num']
+        topo = self.remove_duplicates(topo)
 
         data_name = data_name[0]
+        node_num = node_num[0]
         history_data = self.to_running_device(history_data)  # Shape: [B, L, N, C]
         future_data = self.to_running_device(future_data)    # Shape: [B, L, N, C]
-        edges = self.to_running_device(edges)
-        
+        topo = self.to_running_device(topo)
 
         subgraphs = []
-        subgraphs.append(torch.arange(0, topo.size(0)))
+        subgraphs.append(torch.arange(0, node_num))
 
         batch_size, length, num_nodes, _ = future_data.shape
 
@@ -105,7 +106,7 @@ class TimeSpaceForecastingRunner(BaseTimeSeriesForecastingRunner):
             batch_seen=iter_num,
             epoch=epoch,
             train=train,
-            topo=edges,  
+            topo=topo,  
             data_name=data_name,  
             mask_ratio=0.5,  
             mask_strategy='causal',  
