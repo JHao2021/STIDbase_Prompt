@@ -47,10 +47,6 @@ class STID_Prompt(nn.Module):
                 torch.empty(self.day_of_week_size, self.temp_dim_diw))
             nn.init.xavier_uniform_(self.day_in_week_emb)
 
-        # embedding layer
-        self.time_series_emb_layer = nn.Conv2d(
-            in_channels=self.input_dim * self.input_len, out_channels=self.embed_dim, kernel_size=(1, 1), bias=True)
-
         # encoding
         self.hidden_dim = self.embed_dim+self.node_dim * \
             int(self.if_spatial)+self.temp_dim_tid*int(self.if_day_in_week) + \
