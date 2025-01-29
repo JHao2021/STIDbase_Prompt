@@ -47,7 +47,7 @@ class TimeSpaceForecastingRunner(BaseTimeSeriesForecastingRunner):
         data = data[:, :, :, self.target_features]
         return data
 
-    def remove_duplicates(self, topo):
+    def remove_duplicates_topo(self, topo):
         cleaned_topo = []
         for pair in topo:
             # 提取每个张量的第一个值（因为所有值都相同）
@@ -56,6 +56,26 @@ class TimeSpaceForecastingRunner(BaseTimeSeriesForecastingRunner):
             cleaned_topo.append([first_value, second_value])
         return torch.tensor(cleaned_topo)
 
+    def remove_duplicates_subgraphs(self, subgraphs):
+        cleaned = []
+        for sub in subgraphs:
+            # 对每个 tensor 进行处理
+            cleaned.append([int(value) for tensor in sub for value in tensor.unique()])
+        return cleaned
+    
+    def remove_duplicates_subgraphs_foreachnode(self, subgraphs):
+        cleaned = []
+        for sub in subgraphs:  # 遍历每个子图
+            sub_cleaned = []
+            for tensor_list in sub:  # 遍历子图中的每个张量列表
+                for tensor in tensor_list:  # 遍历张量列表中的每个张量
+                    # 提取唯一值并转换为整数
+                    unique_value = int(torch.unique(tensor).item())
+                    sub_cleaned.append(unique_value)
+            # 将每个子图的 list 转换为 tensor
+            cleaned.append(torch.tensor(sub_cleaned))
+        return cleaned
+    
     def forward(self, data: Dict, epoch: int = None, iter_num: int = None, train: bool = True, **kwargs) -> Dict:
         """
         Performs the forward pass for training, validation, and testing. 
@@ -77,17 +97,14 @@ class TimeSpaceForecastingRunner(BaseTimeSeriesForecastingRunner):
         """
 
         # Preprocess input data
-        future_data, history_data, topo, data_name, node_num = data['target'], data['inputs'], data['topo'], data['data_name'], data['node_num']
-        topo = self.remove_duplicates(topo)
-
+        future_data, history_data, topo, data_name, subgraphs = data['target'], data['inputs'], data['topo'], data['data_name'], data['subgraphs']
+        topo = self.remove_duplicates_topo(topo)
+        subgraphs = self.remove_duplicates_subgraphs_foreachnode(subgraphs)
         data_name = data_name[0]
-        node_num = node_num[0]
         history_data = self.to_running_device(history_data)  # Shape: [B, L, N, C]
         future_data = self.to_running_device(future_data)    # Shape: [B, L, N, C]
         topo = self.to_running_device(topo)
 
-        subgraphs = []
-        subgraphs.append(torch.arange(0, node_num))
 
         batch_size, length, num_nodes, _ = future_data.shape
 

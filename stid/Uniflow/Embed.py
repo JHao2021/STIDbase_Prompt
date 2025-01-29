@@ -73,7 +73,7 @@ class GraphEmbedding(nn.Module):
 
     def forward(self, x, x_mark, edges=None, node_split=None, is_time=1, patch_size=None, hour_num = None):
         '''
-        x: N, T, 1, H, 1
+        x: N, 1, T, H, 1
         x_mark: N, T, D
         '''
         N, _, T, H, _ = x.shape

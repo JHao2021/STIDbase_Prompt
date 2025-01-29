@@ -68,8 +68,12 @@ class TimeSpaceForecastingDataset(BaseDataset):
                 if topo[i, j] != 0:
                     edges.append((i, j))
         self.topo = edges
-        self.node_num = self.adj_matrix.shape[0]
 
+        node_num = self.adj_matrix.shape[0]
+        subgraphs = []
+        # subgraphs.append(list(range(0, node_num))) # 所有节点一个子图
+        subgraphs.append([[i] for i in range(node_num)]) # 一个节点一个子图
+        self.subgraphs = subgraphs
 
     def _load_description(self) -> dict:
         """
@@ -137,7 +141,7 @@ class TimeSpaceForecastingDataset(BaseDataset):
         history_data = self.data[index:index + self.input_len]
         future_data = self.data[index + self.input_len:index + self.input_len + self.output_len]
 
-        return {'inputs': history_data, 'target': future_data, 'topo':self.topo, 'data_name':self.data_name, "node_num":self.node_num}
+        return {'inputs': history_data, 'target': future_data, 'topo':self.topo, 'data_name':self.data_name,"subgraphs":self.subgraphs}
 
     def __len__(self) -> int:
         """

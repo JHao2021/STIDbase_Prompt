@@ -43,7 +43,6 @@ MODEL_PARAM = {
 
     #Prompt params
     "patch_size": 1,
-    "seq_len": 24,
     "data_dir": "",
     "weight_decay": 0.0,
     "batch_size": 2,
