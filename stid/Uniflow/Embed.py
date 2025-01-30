@@ -99,7 +99,7 @@ class GraphEmbedding(nn.Module):
         if is_time==1:
             x = TokenEmb + TimeEmb
         else:
-            x = TokenEmb
+            x = TokenEmb   
         if self.training:
             return self.dropout(x), TimeEmb
         else:

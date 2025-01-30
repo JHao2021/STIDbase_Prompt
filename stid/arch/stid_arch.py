@@ -51,7 +51,8 @@ class STID_Prompt(nn.Module):
         self.hidden_dim = self.embed_dim+self.node_dim * \
             int(self.if_spatial)+self.temp_dim_tid*int(self.if_day_in_week) + \
             self.temp_dim_diw*int(self.if_time_in_day)
-
+        # self.hidden_dim = self.embed_dim
+        
         # self.encoder = nn.Sequential(
         #     *[MultiLayerPerceptron(self.hidden_dim, self.hidden_dim) for _ in range(self.num_layer)])
         self.encoder = nn.Sequential(
@@ -144,10 +145,12 @@ class STID_Prompt(nn.Module):
         if self.if_spatial:
             # expand node embeddings
             # node_emb.append(self.node_emb.unsqueeze(0).expand(
-            #     batch_size, -1, -1).transpose(1, 2).unsqueeze(-1))
-            tmp = self.node_emb.unsqueeze(0).unsqueeze(1).repeat(batch_size, x_attn.size(1), 1, 1)  # [B, K, N, D]
+            #     batch_size, -1, -1).transpose(1, 2))
+            tmp = self.node_emb
+            tmp = tmp.unsqueeze(0).unsqueeze(1).expand(batch_size, x_attn.size(1), -1, -1)  # [B, K, N, D]
             tmp = tmp.mean(dim=2)  # [B, K, D]
             node_emb.append(tmp)
+
 
         # temporal embeddings
         tem_emb = []
@@ -158,8 +161,7 @@ class STID_Prompt(nn.Module):
 
         # concate all embeddings
         # hidden = torch.cat([time_series_emb] + node_emb + tem_emb, dim=1)
-        fused_emb = torch.cat([x_attn] + node_emb + tem_emb, dim=-1)
-
+        fused_emb = torch.cat([x_attn] + node_emb + tem_emb, dim=-1) #add stid
 
         #============================STID===================================
 

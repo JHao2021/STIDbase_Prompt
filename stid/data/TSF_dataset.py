@@ -71,8 +71,8 @@ class TimeSpaceForecastingDataset(BaseDataset):
 
         node_num = self.adj_matrix.shape[0]
         subgraphs = []
-        # subgraphs.append(list(range(0, node_num))) # 所有节点一个子图
-        subgraphs.append([[i] for i in range(node_num)]) # 一个节点一个子图
+        subgraphs.append(list(range(0, node_num))) # 所有节点一个子图
+        # subgraphs.append([[i] for i in range(node_num)]) # 一个节点一个子图
         self.subgraphs = subgraphs
 
     def _load_description(self) -> dict:
