@@ -5,6 +5,7 @@ from .mlp import MultiLayerPerceptron, LastLayerMultiLayerPerceptron
 
 from stid.Uniflow.UniFlow_model import UniFlow, model_select
 from types import SimpleNamespace
+from easytorch.device import to_device
 
 class STID_Prompt(nn.Module):
     """
@@ -115,53 +116,21 @@ class STID_Prompt(nn.Module):
 
         #============================STID===================================
         input_data = history_data[..., range(self.input_dim)]
+        
+        t_i_d_data = history_data[..., 1].unsqueeze(1).unsqueeze(-1) # [B, C, L, N, 1]
+        d_i_w_data = history_data[..., 2].unsqueeze(1).unsqueeze(-1)
+        
 
-        if self.if_time_in_day:
-            t_i_d_data = history_data[..., 1]
-            # In the datasets used in STID, the time_of_day feature is normalized to [0, 1]. We multiply it by 288 to get the index.
-            # If you use other datasets, you may need to change this line.
-            time_in_day_emb = self.time_in_day_emb[(t_i_d_data[:, -1, :] * self.time_of_day_size).type(torch.LongTensor)]
-            time_in_day_emb = time_in_day_emb.unsqueeze(1).repeat(1, x_attn.size(1), 1, 1)  # [B, K, N, D]
-            time_in_day_emb = time_in_day_emb.mean(dim=2)  # [B, K, D]
-        else:
-            time_in_day_emb = None
-        if self.if_day_in_week:
-            d_i_w_data = history_data[..., 2]
-            day_in_week_emb = self.day_in_week_emb[(d_i_w_data[:, -1, :] * self.day_of_week_size).type(torch.LongTensor)]
-            day_in_week_emb = day_in_week_emb.unsqueeze(1).repeat(1, x_attn.size(1), 1, 1)  # [B, K, N, D]
-            day_in_week_emb = day_in_week_emb.mean(dim=2)  # [B, K, D]
+        n_indices = torch.arange(N, dtype=torch.float32)  # node id 的值就是第3维N的索引
+        node_id_data = to_device(n_indices.view(1, 1, 1, N, 1).expand(B, 1, L, N, 1))  # [B, C, L, N, 1]
 
-        else:
-            day_in_week_emb = None
-
-        # time series embedding
-        batch_size, _, num_nodes, _ = input_data.shape
-        # input_data = input_data.transpose(1, 2).contiguous()
-        # input_data = input_data.view(
-        #     batch_size, num_nodes, -1).transpose(1, 2).unsqueeze(-1) #这里把C个特征序列在放到L维了，然后进行嵌入
-        # time_series_emb = self.time_series_emb_layer(input_data)
-
-        node_emb = []
-        if self.if_spatial:
-            # expand node embeddings
-            # node_emb.append(self.node_emb.unsqueeze(0).expand(
-            #     batch_size, -1, -1).transpose(1, 2))
-            tmp = self.node_emb
-            tmp = tmp.unsqueeze(0).unsqueeze(1).expand(batch_size, x_attn.size(1), -1, -1)  # [B, K, N, D]
-            tmp = tmp.mean(dim=2)  # [B, K, D]
-            node_emb.append(tmp)
-
-
-        # temporal embeddings
-        tem_emb = []
-        if time_in_day_emb is not None:
-            tem_emb.append(time_in_day_emb)
-        if day_in_week_emb is not None:
-            tem_emb.append(day_in_week_emb)
+        time_in_day_emb, day_in_week_emb, node_emb = self.prompt.STIDEmddingGraph(
+            t_i_d_data, d_i_w_data, node_id_data, data=data_name, mode=mode, prompt = {'t': img_tmp, 'f':img_spec,'topo':topo}, patch_size = patch_size, split_nodes=subgraphs)
+        
 
         # concate all embeddings
         # hidden = torch.cat([time_series_emb] + node_emb + tem_emb, dim=1)
-        fused_emb = torch.cat([x_attn] + node_emb + tem_emb, dim=-1) #add stid
+        fused_emb = torch.cat([x_attn, time_in_day_emb, day_in_week_emb, node_emb], dim=-1) #add stid
 
         #============================STID===================================
 

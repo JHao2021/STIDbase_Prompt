@@ -106,6 +106,46 @@ class GraphEmbedding(nn.Module):
             return x, TimeEmb
 
 
+class STIDEmbeddingGraph(nn.Module):
+    def __init__(self, c_in, d_model, GridEmb, dropout=0.1, args=None, size1 = 48, size2=7):
+        super(STIDEmbeddingGraph, self).__init__()
+        self.temporal_embedding = TemporalEmbedding(t_patch_size = args.t_patch_size, d_model=d_model, hour_size  = size1, weekday_size = size2)
+        self.dropout = nn.Dropout(p=dropout)
+        self.c_in = c_in
+        self.d_model = d_model
+        self.MIN, self.MID, self.MAX = [2,2,100]
+        self.gcn = GCN(d_model, d_model, d_model)
+        self.DataEmb = GridEmb
+        self.temporal_conv = nn.Conv1d(in_channels=1, out_channels=d_model, kernel_size=args.t_patch_size, stride=args.t_patch_size)
+        encdoer_layer = nn.TransformerEncoderLayer(d_model=self.d_model, nhead=2, dim_feedforward=self.d_model//2, batch_first = True)
+        self.spatial_attn = nn.TransformerEncoder(encoder_layer=encdoer_layer, num_layers=1)
+        self.args = args
+
+    def forward(self, x, edges=None, node_split=None, is_time=1, patch_size=None, hour_num = None):
+        '''
+        x: N, 1, T, H, 1
+        '''
+        N, _, T, H, _ = x.shape
+
+        x = x.squeeze((1,4)).permute(0,2,1).reshape(N * H, 1, self.args.his_len)
+        temporal_value_emb = self.temporal_conv(x).permute(0,2,1).reshape(N, H, -1, self.d_model).permute(0,2,1,3).reshape(-1, H, self.d_model)
+        
+        TokenEmb = self.gcn(temporal_value_emb, edges.permute(1,0)).reshape(N, -1, H, self.d_model) # N * seqlen//t_patch_size * H * D
+
+        TokenEmb = torch.cat([torch.mean(torch.gather(TokenEmb, 2 ,group.view(1, 1, group.shape[0], 1).expand(TokenEmb.shape[0], TokenEmb.shape[1], group.shape[0], TokenEmb.shape[3]).to(x).long()),dim=2) for group in node_split],2).reshape(N, -1, TokenEmb.shape[-1])
+
+        x = TokenEmb   
+
+        if self.training:
+            return self.dropout(x)
+        else:
+            return x
+
+
+
+
+
+
 class DataEmbedding(nn.Module):
     def __init__(self, c_in, d_model, dropout=0.1, args=None, size1 = 48, size2=7):
         super(DataEmbedding, self).__init__()

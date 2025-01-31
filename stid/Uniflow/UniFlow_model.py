@@ -7,7 +7,7 @@ import numpy as np
 from timm.models.layers import to_2tuple
 from timm.models.vision_transformer import DropPath, Mlp
 
-from .Embed import GraphEmbedding, DataEmbedding
+from .Embed import GraphEmbedding, DataEmbedding, STIDEmbeddingGraph
 from .mask_strategy import *
 import copy
 
@@ -83,6 +83,18 @@ class UniFlow(nn.Module):
         self.Embedding_patch = DataEmbedding(1, embed_dim, args=self.args)
         self.Embedding_patch_graph = GraphEmbedding(1, embed_dim, GridEmb = self.Embedding_patch, args=self.args)
 
+        # ==================================  STID ============================================
+        self.time_in_day_emb_patch = DataEmbedding(1, embed_dim, args=self.args)
+        self.time_in_day_emb_patch_graph = STIDEmbeddingGraph(1, embed_dim, GridEmb = self.time_in_day_emb_patch, args=self.args)
+
+        self.day_in_week_emb_patch = DataEmbedding(1, embed_dim, args=self.args)
+        self.day_in_week_emb_patch_graph = STIDEmbeddingGraph(1, embed_dim, GridEmb = self.day_in_week_emb_patch, args=self.args)
+        
+        self.node_emb_patch = DataEmbedding(1, embed_dim, args=self.args)
+        self.node_emb_patch_graph = STIDEmbeddingGraph(1, embed_dim, GridEmb = self.node_emb_patch, args=self.args)
+        # ==================================  STID ============================================
+
+
         # mask
         self.t_patch_size = t_patch_size
         self.decoder_embed_dim = decoder_embed_dim
@@ -106,6 +118,10 @@ class UniFlow(nn.Module):
         
         self.Embedding_patch.multi_patch()
 
+        self.time_in_day_emb_patch.multi_patch()
+        self.day_in_week_emb_patch.multi_patch()
+        self.node_emb_patch.multi_patch()
+        
         self.head_layer_1 = nn.Sequential(*[
             nn.Linear(self.decoder_embed_dim, self.decoder_embed_dim, bias= not self.args.no_qkv_bias),
             nn.GELU(),
@@ -148,6 +164,14 @@ class UniFlow(nn.Module):
         elif isinstance(m, nn.LayerNorm):
             nn.init.constant_(m.bias, 0)
             nn.init.constant_(m.weight, 1.0)
+
+
+    def STIDEmddingGraph(self, t_i_d_data, d_i_w_data, node_id_data, data=None, mode='backward',prompt = {}, patch_size = 1, split_nodes=None):
+        edges = prompt['topo']
+        time_in_day_emb = self.time_in_day_emb_patch_graph(t_i_d_data, edges, split_nodes, is_time = self.args.is_time_emb, patch_size=patch_size, hour_num = data)
+        day_in_week_emb = self.day_in_week_emb_patch_graph(d_i_w_data, edges, split_nodes, is_time = self.args.is_time_emb, patch_size=patch_size, hour_num = data)
+        node_emb = self.node_emb_patch_graph(node_id_data, edges, split_nodes, is_time = self.args.is_time_emb, patch_size=patch_size, hour_num = data)
+        return time_in_day_emb, day_in_week_emb, node_emb
 
 
     def forward_encoder(self, x, x_mark, mask_ratio, mask_strategy, seed=None, data=None, mode='backward',prompt = {}, patch_size = 1, split_nodes=None):
