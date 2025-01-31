@@ -518,8 +518,6 @@ class UniFlow(nn.Module):
 
         assert mode in ['backward','forward']
 
-        x, mask, ids_restore, ids_keep = causal_masking(x, mask_ratio, T=T, mask_strategy=mask_strategy)
-
         # if 'Graph' not in data:
         #     input_size = (T, H//patch_size, W//patch_size)
         # else:
@@ -616,7 +614,8 @@ class UniFlow(nn.Module):
         # for index, blk in enumerate(self.blocks):
         #     x_attn = blk(x_attn, attn_bias = attn_bias)
             
-                       
+        mask = None
+        ids_restore = None
         return x_attn, mask, ids_restore, input_size, TimeEmb,  prompt_save
 
     def forward_decoder(self, x, x_mark, mask, ids_restore, mask_strategy, TimeEmb, input_size=None,  data=None, prompt_graph = {}):
@@ -624,11 +623,11 @@ class UniFlow(nn.Module):
         T, H, W = input_size
 
         # embed tokens
-        x = self.decoder_embed(x)
+        # x = self.decoder_embed(x)
             
-        C = x.shape[-1]
+        # C = x.shape[-1]
 
-        x = causal_restore(x, ids_restore, N, T, H,  W, C, self.mask_token)
+        # x = causal_restore(x, ids_restore, N, T, H,  W, C, self.mask_token)
 
         # decoder_pos_embed = self.pos_embed_dec(ids_restore, N, input_size)
 
@@ -640,10 +639,10 @@ class UniFlow(nn.Module):
         # else:
         #     x_attn = x + decoder_pos_embed
 
-        if self.args.is_time_emb == 1:
-            x_attn = x + TimeEmb
-        else:
-            x_attn = x 
+        # if self.args.is_time_emb == 1:
+        #     x_attn = x + TimeEmb
+        # else:
+        x_attn = x 
 
         attn_bias = prompt_graph
         
@@ -652,8 +651,8 @@ class UniFlow(nn.Module):
             #增强部分
             '''
             prompt_t, prompt_f = prompt_graph['t'], prompt_graph['f']
-            prompt_t = prompt_t.reshape(N, -1, H*W, prompt_t.shape[-1])[:,:1].repeat(1,(self.args.his_len+self.args.pred_len)//self.args.t_patch_size,1,1).reshape(N, -1, prompt_t.shape[-1])
-            prompt_f = prompt_f.reshape(N, -1, H*W, prompt_f.shape[-1])[:,:1].repeat(1,(self.args.his_len+self.args.pred_len)//self.args.t_patch_size,1,1).reshape(N, -1, prompt_f.shape[-1])
+            prompt_t = prompt_t.reshape(N, -1, H*W, prompt_t.shape[-1])[:,:1].repeat(1,(self.args.his_len)//self.args.t_patch_size,1,1).reshape(N, -1, prompt_t.shape[-1])
+            prompt_f = prompt_f.reshape(N, -1, H*W, prompt_f.shape[-1])[:,:1].repeat(1,(self.args.his_len)//self.args.t_patch_size,1,1).reshape(N, -1, prompt_f.shape[-1])
 
             assert x_attn.shape == prompt_t.shape == prompt_f.shape
             '''
@@ -668,8 +667,8 @@ class UniFlow(nn.Module):
 
         if self.args.is_prompt == 1 and 'node' in self.args.prompt_content:
             prompt_t, prompt_f = prompt_graph['node_t'], prompt_graph['node_f']
-            prompt_t = prompt_t.reshape(N, -1, H*W, prompt_t.shape[-1])[:,:1].repeat(1,(self.args.his_len+self.args.pred_len)//self.args.t_patch_size,1,1).reshape(N, -1, prompt_t.shape[-1])
-            prompt_f = prompt_f.reshape(N, -1, H*W, prompt_f.shape[-1])[:,:1].repeat(1,(self.args.his_len+self.args.pred_len)//self.args.t_patch_size,1,1).reshape(N, -1, prompt_f.shape[-1])
+            prompt_t = prompt_t.reshape(N, -1, H*W, prompt_t.shape[-1])[:,:1].repeat(1,(self.args.his_len)//self.args.t_patch_size,1,1).reshape(N, -1, prompt_t.shape[-1])
+            prompt_f = prompt_f.reshape(N, -1, H*W, prompt_f.shape[-1])[:,:1].repeat(1,(self.args.his_len)//self.args.t_patch_size,1,1).reshape(N, -1, prompt_f.shape[-1])
 
             assert x_attn.shape == prompt_t.shape == prompt_f.shape
             if 'node_t' in self.args.prompt_content:

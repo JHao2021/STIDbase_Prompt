@@ -52,12 +52,28 @@ class TimeSpaceForecastingDataset(BaseDataset):
         self.data = self._load_data()
         processed_adj_mx, raw_adj_mx = load_adj(self.adj_matrix_file_path, "original") # 加载邻接矩阵
         self.adj_matrix = raw_adj_mx  
+
         ## 打印信息
         if self.adj_matrix is not None:
             size = self.adj_matrix.shape
             count_greater_than_zero = np.sum(self.adj_matrix > 0)
             print(f"Adjacency Matrix Size: {size}")
             print(f"Number of elements greater than 0: {count_greater_than_zero}")
+
+        # prompt的topo是边，不是邻接矩阵
+        topo = self.adj_matrix
+        edges = []
+        for i in range(topo.shape[0]):  # 使用 .shape[0] 获取行数
+            for j in range(i + 1, topo.shape[1]):  # 使用 .shape[1] 获取列数
+                if topo[i, j] != 0:
+                    edges.append((i, j))
+        self.topo = edges
+
+        node_num = self.adj_matrix.shape[0]
+        subgraphs = []
+        subgraphs.append(list(range(0, node_num))) # 所有节点一个子图
+        # subgraphs.append([[i] for i in range(node_num)]) # 一个节点一个子图
+        self.subgraphs = subgraphs
 
     def _load_description(self) -> dict:
         """
@@ -124,7 +140,8 @@ class TimeSpaceForecastingDataset(BaseDataset):
         """
         history_data = self.data[index:index + self.input_len]
         future_data = self.data[index + self.input_len:index + self.input_len + self.output_len]
-        return {'inputs': history_data, 'target': future_data, 'topo':self.adj_matrix, 'data_name':self.data_name}
+
+        return {'inputs': history_data, 'target': future_data, 'topo':self.topo, 'data_name':self.data_name,"subgraphs":self.subgraphs}
 
     def __len__(self) -> int:
         """

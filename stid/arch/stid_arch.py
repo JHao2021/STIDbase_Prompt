@@ -91,9 +91,9 @@ class STID_Prompt(nn.Module):
         # prepare data
         B, L, N, C = history_data.shape
         # =====================Prompt=========================================
-        combined_data = torch.cat((history_data, future_data), dim=1)
-        imgs = combined_data[..., [0]].permute(0, 3, 1, 2).unsqueeze(-1) #从[B, L, N, C]改为[B, C, L, N, 1]
-        imgs_mark = combined_data[:, :, 0, [1, 2]]
+        # combined_data = torch.cat((history_data, future_data), dim=1)
+        imgs = history_data[..., [0]].permute(0, 3, 1, 2).unsqueeze(-1) #从[B, L, N, C]改为[B, C, L, N, 1]
+        imgs_mark = history_data[:, :, 0, [1, 2]]
 
         #由于Prompt的tid和diw都是整数，所以重新处理时间特征
         time_of_day = imgs_mark[..., 0] 
@@ -191,12 +191,8 @@ class STID_Prompt(nn.Module):
 
         # [prompt]Output Projection : 
         prediction, target = self.prompt.Output_Proj(prediction, subgraphs, data_name, imgs)
-        assert prediction.shape == target.shape
-        assert prediction.shape[1] == self.args.his_len + self.args.pred_len
-        # prediction = prediction.view(B, L, N, C)
-
+       
         prediction = prediction.unsqueeze(-1)
         target = target.unsqueeze(-1)
 
-        prediction = prediction[:, self.input_len:, :, :]
         return prediction, target

@@ -104,7 +104,7 @@ class GraphEmbedding(nn.Module):
         elif '96' in hour_num:
             TimeEmb = self.DataEmb.temporal_patch_96(x_mark)
 
-        x = x.squeeze((1,4)).permute(0,2,1).reshape(N * H, 1, self.args.his_len + self.args.pred_len)
+        x = x.squeeze((1,4)).permute(0,2,1).reshape(N * H, 1, self.args.his_len)  # + self.args.pred_len)
         temporal_value_emb = self.temporal_conv(x).permute(0,2,1).reshape(N, H, -1, self.d_model).permute(0,2,1,3).reshape(-1, H, self.d_model)
         
         TokenEmb = self.gcn(temporal_value_emb, edges.permute(1,0)).reshape(N, -1, H, self.d_model) # N * seqlen//t_patch_size * H * D
