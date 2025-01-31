@@ -183,16 +183,10 @@ class UniFlow(nn.Module):
         TimeEmb = None
 
         x, TimeEmb = self.Embedding_patch_graph(x, x_mark, edges, split_nodes, is_time = self.args.is_time_emb, patch_size=patch_size, hour_num = data)
-        
 
         T = T // self.args.t_patch_size
 
-        x, mask, ids_restore, ids_keep = causal_masking(x, mask_ratio, T=T, mask_strategy=mask_strategy)
-
-        input_size = (T, len(split_nodes), 1)
-
-     
-        return x, mask, ids_restore, input_size, TimeEmb
+        return x
 
     def forward_decoder(self, x, x_mark, mask, ids_restore, mask_strategy, TimeEmb, input_size=None,  data=None):
         N = x.shape[0]

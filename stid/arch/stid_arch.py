@@ -89,9 +89,8 @@ class STID_Prompt(nn.Module):
         # prepare data
         B, L, N, C = history_data.shape
         # =====================Prompt=========================================
-        combined_data = torch.cat((history_data, future_data), dim=1)
-        imgs = combined_data[..., [0]].permute(0, 3, 1, 2).unsqueeze(-1) #从[B, L, N, C]改为[B, C, L, N, 1]
-        imgs_mark = combined_data[:, :, 0, [1, 2]]
+        imgs = history_data[..., [0]].permute(0, 3, 1, 2).unsqueeze(-1) #从[B, L, N, C]改为[B, C, L, N, 1]
+        imgs_mark = history_data[:, :, 0, [1, 2]]
 
         #由于Prompt的tid和diw都是整数，所以重新处理时间特征
         time_of_day = imgs_mark[..., 0] 
@@ -111,7 +110,7 @@ class STID_Prompt(nn.Module):
         img_tmp = None
         img_spec = None
 
-        x_attn, mask, ids_restore, input_size, TimeEmb = self.prompt.forward_encoder(imgs, imgs_mark, mask_ratio, mask_strategy, seed=seed, data=data_name, mode=mode, prompt = {'t': img_tmp, 'f':img_spec,'topo':topo}, patch_size = patch_size, split_nodes=subgraphs)
+        x_attn = self.prompt.forward_encoder(imgs, imgs_mark, mask_ratio, mask_strategy, seed=seed, data=data_name, mode=mode, prompt = {'t': img_tmp, 'f':img_spec,'topo':topo}, patch_size = patch_size, split_nodes=subgraphs)
         # x_attn : [B, L, D]
 
         #============================STID===================================
@@ -133,17 +132,12 @@ class STID_Prompt(nn.Module):
         fused_emb = torch.cat([x_attn, time_in_day_emb, day_in_week_emb, node_emb], dim=-1) #add stid
 
         #============================STID===================================
-
-
         fused_emb = fused_emb.permute(0, 2, 1).unsqueeze(-1)
         # encoding
         hidden = self.encoder(fused_emb) #[B, D, L, 1], 沿D维编码
         hidden = hidden.squeeze(-1).permute(0, 2, 1)
 
         # =========================================================================
-
-        hidden = self.prompt.forward_decoder(hidden, imgs_mark, mask, ids_restore, mask_strategy, TimeEmb, input_size = input_size, data = data_name)  # [N, L, p*p*1]
-
         # regression
         hidden = hidden.permute(0, 2, 1).unsqueeze(-1)
         prediction = self.regression_layer(hidden)
@@ -152,12 +146,7 @@ class STID_Prompt(nn.Module):
 
         # [prompt]Output Projection : 
         prediction, target = self.prompt.Output_Proj(prediction, subgraphs, data_name, imgs)
-        assert prediction.shape == target.shape
-        assert prediction.shape[1] == self.args.his_len + self.args.pred_len
-        # prediction = prediction.view(B, L, N, C)
-
         prediction = prediction.unsqueeze(-1)
         target = target.unsqueeze(-1)
 
-        prediction = prediction[:, self.input_len:, :, :]
         return prediction, target
