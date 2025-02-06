@@ -108,7 +108,7 @@ class UniFlow(nn.Module):
 
         self.mask_token = nn.Parameter(torch.zeros(1, 1, decoder_embed_dim))
 
-        self.pred_model_linear_GraphBJ = nn.Linear(decoder_embed_dim, self.t_patch_size * 512 * in_chans)
+        self.pred_model_linear_GraphBJ = nn.Linear(decoder_embed_dim, self.t_patch_size * 1024 * in_chans)
 
         self.initialize_weights_trivial()
 
