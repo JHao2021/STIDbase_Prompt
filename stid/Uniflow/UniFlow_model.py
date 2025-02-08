@@ -310,7 +310,7 @@ class UniFlow(nn.Module):
 
         self.pred_model = TransformerDecoderModel(d_model=decoder_embed_dim, dim_feedforward = decoder_embed_dim//2, nhead=2, num_decoder_layers=1)
         # self.pred_model_linear_GraphBJ = nn.Linear(decoder_embed_dim, self.t_patch_size * 105 * in_chans)
-        self.pred_model_linear_GraphBJ = nn.Linear(decoder_embed_dim, self.t_patch_size * 512 * in_chans)
+        self.pred_model_linear_GraphBJ = nn.Linear(decoder_embed_dim, self.t_patch_size * 1024 * in_chans)
         self.pred_model_linear_GraphNJ = nn.Linear(decoder_embed_dim, self.t_patch_size * 105 * in_chans)
         self.pred_model_linear_GraphSH  = nn.Linear(decoder_embed_dim, self.t_patch_size * 210 * in_chans)
 
