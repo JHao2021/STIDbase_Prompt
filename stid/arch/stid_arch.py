@@ -70,8 +70,10 @@ class STID_Prompt(nn.Module):
         self.prompt = model_select(args=self.args)
         if self.args.multi_patch:
             print('multi_patch')
-            self.prompt.init_multiple_patch()        
-        self.prompt.init_prompt()
+            self.prompt.init_multiple_patch()  
+        if self.args.is_prompt == 1: 
+            print('start prompt')        
+            self.prompt.init_prompt()
 
     def forward(self, history_data: torch.Tensor, future_data: torch.Tensor, batch_seen: int, epoch: int, train: bool, 
     mask_ratio=0.5, mask_strategy='causal',seed=520, data_name='none',  mode='backward',topo = None, subgraphs = None, patch_size = 100, **kwargs) -> torch.Tensor:
@@ -84,48 +86,6 @@ class STID_Prompt(nn.Module):
             torch.Tensor: prediction with shape [B, L, N, C]
         """
 
-        # prepare data
-        B, L, N, C = history_data.shape
-        # input_data = history_data[..., range(self.input_dim)]
-
-        # if self.if_time_in_day:
-        #     t_i_d_data = history_data[..., 1]
-        #     # In the datasets used in STID, the time_of_day feature is normalized to [0, 1]. We multiply it by 288 to get the index.
-        #     # If you use other datasets, you may need to change this line.
-        #     time_in_day_emb = self.time_in_day_emb[(t_i_d_data[:, -1, :] * self.time_of_day_size).type(torch.LongTensor)]
-        # else:
-        #     time_in_day_emb = None
-        # if self.if_day_in_week:
-        #     d_i_w_data = history_data[..., 2]
-        #     day_in_week_emb = self.day_in_week_emb[(d_i_w_data[:, -1, :] * self.day_of_week_size).type(torch.LongTensor)]
-        # else:
-        #     day_in_week_emb = None
-
-        # # time series embedding
-        # batch_size, _, num_nodes, _ = input_data.shape
-        # input_data = input_data.transpose(1, 2).contiguous()
-        # input_data = input_data.view(
-        #     batch_size, num_nodes, -1).transpose(1, 2).unsqueeze(-1) #这里把C个特征序列在放到L维了，然后进行嵌入
-        # time_series_emb = self.time_series_emb_layer(input_data)
-
-        # node_emb = []
-        # if self.if_spatial:
-        #     # expand node embeddings
-        #     node_emb.append(self.node_emb.unsqueeze(0).expand(
-        #         batch_size, -1, -1).transpose(1, 2).unsqueeze(-1))
-        # # temporal embeddings
-        # tem_emb = []
-        # if time_in_day_emb is not None:
-        #     tem_emb.append(time_in_day_emb.transpose(1, 2).unsqueeze(-1))
-        # if day_in_week_emb is not None:
-        #     tem_emb.append(day_in_week_emb.transpose(1, 2).unsqueeze(-1))
-
-        # # concate all embeddings
-        # hidden = torch.cat([time_series_emb] + node_emb + tem_emb, dim=1)
-
-        # encoding
-        # hidden = self.encoder(hidden)
-#
         # Prompt
         combined_data = torch.cat((history_data, future_data), dim=1)
         imgs = combined_data[..., [0]].permute(0, 3, 1, 2).unsqueeze(-1) #从[B, L, N, C]改为[B, C, L, N, 1]
@@ -156,20 +116,13 @@ class STID_Prompt(nn.Module):
 
         T, H, W = imgs.shape[2:]
         x_attn, mask, ids_restore, input_size, TimeEmb, prompt = self.prompt.forward_encoder(imgs, imgs_mark, mask_ratio, mask_strategy, seed=seed, data=data_name, mode=mode, prompt = {'t': img_tmp, 'f':img_spec,'topo':topo}, patch_size = patch_size, split_nodes=subgraphs)
-        # x_attn : [B, L, D]
-        x_attn = x_attn.permute(0, 2, 1).unsqueeze(-1)
-        hidden = self.encoder(x_attn) #[B, D, L, 1], 沿D维编码
-        hidden = hidden.squeeze(-1).permute(0, 2, 1)
-
+        hidden = x_attn
         # =========================================================================
 
         hidden = self.prompt.forward_decoder(hidden, imgs_mark, mask, ids_restore, mask_strategy, TimeEmb, input_size = input_size, data = data_name, prompt_graph = prompt)  # [N, L, p*p*1]
 
-        # regression
-        hidden = hidden.permute(0, 2, 1).unsqueeze(-1)
-        prediction = self.regression_layer(hidden)
-        prediction = prediction.squeeze(-1).permute(0, 2, 1)
 
+        prediction = hidden.squeeze(-1)
 
         # [prompt]Output Projection : 
         prediction, target = self.prompt.Output_Proj(prediction, subgraphs, data_name, imgs)

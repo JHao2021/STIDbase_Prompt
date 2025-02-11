@@ -310,7 +310,7 @@ class UniFlow(nn.Module):
 
         self.pred_model = TransformerDecoderModel(d_model=decoder_embed_dim, dim_feedforward = decoder_embed_dim//2, nhead=2, num_decoder_layers=1)
         # self.pred_model_linear_GraphBJ = nn.Linear(decoder_embed_dim, self.t_patch_size * 105 * in_chans)
-        self.pred_model_linear_GraphBJ = nn.Linear(decoder_embed_dim, self.t_patch_size * 512 * in_chans)
+        self.pred_model_linear_GraphBJ = nn.Linear(decoder_embed_dim, self.t_patch_size * 1024 * in_chans)
         self.pred_model_linear_GraphNJ = nn.Linear(decoder_embed_dim, self.t_patch_size * 105 * in_chans)
         self.pred_model_linear_GraphSH  = nn.Linear(decoder_embed_dim, self.t_patch_size * 210 * in_chans)
 
@@ -613,8 +613,8 @@ class UniFlow(nn.Module):
             prompt_save['node_t'] = prompt_t.clone()
             prompt_save['node_f'] = prompt_f.clone()
 
-        # for index, blk in enumerate(self.blocks):
-        #     x_attn = blk(x_attn, attn_bias = attn_bias)
+        for index, blk in enumerate(self.blocks):
+            x_attn = blk(x_attn, attn_bias = attn_bias)
             
                        
         return x_attn, mask, ids_restore, input_size, TimeEmb,  prompt_save
@@ -676,9 +676,9 @@ class UniFlow(nn.Module):
 
 
         # apply Transformer blocks
-        # for index, blk in enumerate(self.decoder_blocks):
-        #     x_attn = blk(x_attn, attn_bias = attn_bias)
-        # x_attn = self.decoder_norm(x_attn)
+        for index, blk in enumerate(self.decoder_blocks):
+            x_attn = blk(x_attn, attn_bias = attn_bias)
+        x_attn = self.decoder_norm(x_attn)
 
 
 
