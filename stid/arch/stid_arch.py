@@ -76,7 +76,7 @@ class STID_Prompt(nn.Module):
             self.prompt.init_prompt()
 
     def forward(self, history_data: torch.Tensor, future_data: torch.Tensor, batch_seen: int, epoch: int, train: bool, 
-    mask_ratio=0.5, mask_strategy='causal',seed=520, data_name='none',  mode='backward',topo = None, subgraphs = None, patch_size = 100, **kwargs) -> torch.Tensor:
+    mask_ratio=0.5, mask_strategy='causal',seed=520, data_name='none',  mode='backward',topo = None, subgraphs = None, **kwargs) -> torch.Tensor:
         """Feed forward of STID.
 
         Args:
@@ -85,7 +85,7 @@ class STID_Prompt(nn.Module):
         Returns:
             torch.Tensor: prediction with shape [B, L, N, C]
         """
-
+        patch_size = self.args.patch_size
         # Prompt
         combined_data = torch.cat((history_data, future_data), dim=1)
         imgs = combined_data[..., [0]].permute(0, 3, 1, 2).unsqueeze(-1) #从[B, L, N, C]改为[B, C, L, N, 1]

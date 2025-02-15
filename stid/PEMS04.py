@@ -42,56 +42,56 @@ MODEL_PARAM = {
 
 
     #Prompt params
-    "patch_size": 1,
-    "seq_len": 24,
-    "data_dir": "",
-    "weight_decay": 0.0,
-    "batch_size": 2,
-    "early_stop": 10,
-    "log_interval": 5,
-    "device_id": '0',
-    "machine": 'LM1',
+    "patch_size": 4,
+    # "seq_len": 24,
+    # "data_dir": "",
+    # "weight_decay": 0.0,
+    # "batch_size": 2,
+    # "early_stop": 10,
+    # "log_interval": 5,
+    # "device_id": '0',
+    # "machine": 'LM1',
     "mask_ratio": 0.5,
-    "random": True,
-    "eval": True,
-    "is_block": True,
-    "data_norm": 1,
-    "clip_grad": 0.02,
+    # "random": True,
+    # "eval": True,
+    # "is_block": True,
+    # "data_norm": 1,
+    # "clip_grad": 0.02,
     "mask_strategy": 'causal',
     "mode": 'training',
-    "file_load_path": '',
-    "lr_anneal_steps": 150,
-    "total_epoches": 200,
-    "lr": 1e-3,
+    # "file_load_path": '',
+    # "lr_anneal_steps": 150,
+    # "total_epoches": 200,
+    # "lr": 1e-3,
     "pos_emb": 'SinCos',
     "no_qkv_bias": 0,
     "is_prompt": 1,
     "is_time_emb": 1,
-    "batch_size_taxibj": 128,
-    "batch_size_nj": 256,
-    "batch_size_nyc": 256,
-    "batch_size_crowd": 256,
-    "emb_tuning": 0,
-    "mask_ablation": '',
-    "data_type": 'GridGraph',
-    "batch_size_graph_large": 32,
-    "batch_size_graph_small": 64,
-    "spec_mlp": 0,
-    "few_ratio": 1.0,
+    # "batch_size_taxibj": 128,
+    # "batch_size_nj": 256,
+    # "batch_size_nyc": 256,
+    # "batch_size_crowd": 256,
+    # "emb_tuning": 0,
+    # "mask_ablation": '',
+    # "data_type": 'GridGraph',
+    # "batch_size_graph_large": 32,
+    # "batch_size_graph_small": 64,
+    # "spec_mlp": 0,
+    # "few_ratio": 1.0,
     "multi_patch": True,
-    "seed": 100,
-    "few_data": '',
-    "finetune": 0,
+    # "seed": 100,
+    # "few_data": '',
+    # "finetune": 0,
 
 
-    "t_patch_size": 1,
+    "t_patch_size": 4,
     "his_len": INPUT_LEN,
     "pred_len": OUTPUT_LEN,
     "used_data": "GridGraphall",
     "num_memory": 128,
     "prompt_content": "node_graph",
     "size": "middle",
-    "batch_ratio": 0.05,
+    # "batch_ratio": 0.05,
 
 }
 NUM_EPOCHS = 100
@@ -162,8 +162,8 @@ CFG.TRAIN.LOSS = masked_mae
 CFG.TRAIN.OPTIM = EasyDict()
 CFG.TRAIN.OPTIM.TYPE = "Adam"
 CFG.TRAIN.OPTIM.PARAM = {
-    "lr": 0.002,
-    "weight_decay": 0.0001,
+    "lr": 0.0008, #0.002,
+    "weight_decay": 0.0005,#0.0001,
 }
 # Learning rate scheduler settings
 CFG.TRAIN.LR_SCHEDULER = EasyDict()
@@ -173,29 +173,29 @@ CFG.TRAIN.LR_SCHEDULER.PARAM = {
     "gamma": 0.5
 }
 CFG.TRAIN.CLIP_GRAD_PARAM = {
-    'max_norm': 5.0
+    'max_norm': 1.0 #5.0
 }
 # Train data loader settings
 CFG.TRAIN.DATA = EasyDict()
-CFG.TRAIN.DATA.BATCH_SIZE = 8
+CFG.TRAIN.DATA.BATCH_SIZE = 32
 CFG.TRAIN.DATA.SHUFFLE = True
 
 ############################## Validation Configuration ##############################
 CFG.VAL = EasyDict()
 CFG.VAL.INTERVAL = 1
 CFG.VAL.DATA = EasyDict()
-CFG.VAL.DATA.BATCH_SIZE = 8
+CFG.VAL.DATA.BATCH_SIZE = 32
 
 ############################## Test Configuration ##############################
 CFG.TEST = EasyDict()
 CFG.TEST.INTERVAL = 1
 CFG.TEST.DATA = EasyDict()
-CFG.TEST.DATA.BATCH_SIZE = 8
+CFG.TEST.DATA.BATCH_SIZE = 32
 
 ############################## Evaluation Configuration ##############################
 
 CFG.EVAL = EasyDict()
 
 # Evaluation parameters
-CFG.EVAL.HORIZONS = [3, 6, 12] # Prediction horizons for evaluation. Default: []
+CFG.EVAL.HORIZONS = [] # Prediction horizons for evaluation. Default: [] 3, 6, 12
 CFG.EVAL.USE_GPU = True # Whether to use GPU for evaluation. Default: True

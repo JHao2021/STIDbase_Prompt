@@ -39,7 +39,7 @@ MODEL_PARAM = {
     "time_of_day_size": 288,
     "day_of_week_size": 7,
         #Prompt params
-    "patch_size": 1,
+    "patch_size": 4,
     "data_dir": "",
     "weight_decay": 0.0,
     "batch_size": 2,
@@ -80,7 +80,7 @@ MODEL_PARAM = {
     "finetune": 0,
 
 
-    "t_patch_size": 1,
+    "t_patch_size": 4,
     "his_len": INPUT_LEN,
     "pred_len": OUTPUT_LEN,
     "used_data": "GridGraphall",

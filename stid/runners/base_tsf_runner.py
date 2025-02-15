@@ -411,7 +411,7 @@ class BaseTimeSeriesForecastingRunner(BaseRunner):
             input_data['target'] = self.scaler.transform(input_data['target'])
             input_data['inputs'] = self.scaler.transform(input_data['inputs'])
         # TODO: add more preprocessing steps as needed.
-        return input_data
+        return input_data           
 
     def postprocessing(self, input_data: Dict) -> Dict:
         """Postprocess data.

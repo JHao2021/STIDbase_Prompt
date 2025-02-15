@@ -310,7 +310,7 @@ class UniFlow(nn.Module):
 
         self.pred_model = TransformerDecoderModel(d_model=decoder_embed_dim, dim_feedforward = decoder_embed_dim//2, nhead=2, num_decoder_layers=1)
         # self.pred_model_linear_GraphBJ = nn.Linear(decoder_embed_dim, self.t_patch_size * 105 * in_chans)
-        self.pred_model_linear_GraphBJ = nn.Linear(decoder_embed_dim, self.t_patch_size * 1024 * in_chans)
+        self.pred_model_linear_GraphBJ = nn.Linear(decoder_embed_dim, self.t_patch_size * 307 * in_chans)
         self.pred_model_linear_GraphNJ = nn.Linear(decoder_embed_dim, self.t_patch_size * 105 * in_chans)
         self.pred_model_linear_GraphSH  = nn.Linear(decoder_embed_dim, self.t_patch_size * 210 * in_chans)
 
@@ -509,7 +509,7 @@ class UniFlow(nn.Module):
         # if 'Graph' not in data:
         #     x, TimeEmb = self.Embedding_patch(x, x_mark, edges, is_time = self.args.is_time_emb, patch_size=patch_size, hour_num = data)
         # else:
-        # 将 [B, T, N, C] 的维度改变为 [B, L, C] 
+        # 将 [B, T, N, C] 的维度改变为 [B, L, D] 
         x, TimeEmb = self.Embedding_patch_graph(x, x_mark, edges, split_nodes, is_time = self.args.is_time_emb, patch_size=patch_size, hour_num = data)
         
         _, L, C = x.shape
@@ -849,7 +849,8 @@ class UniFlow(nn.Module):
         seq_lengths = [len(i) for i in subgraphs] 
         max_len = max(seq_lengths)
 
-        pred = self.pred_model_linear_GraphBJ(pred).reshape(pred.shape[0],T//self.args.t_patch_size,len(subgraphs),self.args.t_patch_size, -1).permute(0,1,3,2,4)
+        pred = self.pred_model_linear_GraphBJ(pred)
+        pred = pred.reshape(pred.shape[0],T//self.args.t_patch_size,len(subgraphs),self.args.t_patch_size, -1).permute(0,1,3,2,4)
 
         
         pred = pred.reshape(pred.shape[0], T, len(subgraphs), -1)

@@ -2,7 +2,12 @@ from typing import Dict
 
 import torch
 from .base_tsf_runner import BaseTimeSeriesForecastingRunner
+from tqdm import tqdm
 import time
+from easytorch.utils import TimePredictor, get_local_rank, is_master, master_only
+from easytorch.utils.data_prefetcher import DevicePrefetcher
+from typing import Tuple, Union, Optional, Dict
+
 class TimeSpaceForecastingRunner(BaseTimeSeriesForecastingRunner):
     """
     A Simple Runner for Time Series Forecasting: 
@@ -79,7 +84,7 @@ class TimeSpaceForecastingRunner(BaseTimeSeriesForecastingRunner):
                     cleaned.append(torch.tensor(sub_cleaned))
         return cleaned
     
-    def forward(self, data: Dict, epoch: int = None, iter_num: int = None, train: bool = True, **kwargs) -> Dict:
+    def forward(self, data: Dict, topo, data_name, subgraphs, epoch: int = None, iter_num: int = None, train: bool = True, **kwargs) -> Dict:
         """
         Performs the forward pass for training, validation, and testing. 
 
@@ -100,16 +105,16 @@ class TimeSpaceForecastingRunner(BaseTimeSeriesForecastingRunner):
         """
 
         # Preprocess input data
-        future_data, history_data, topo, data_name, subgraphs = data['target'], data['inputs'], data['topo'], data['data_name'], data['subgraphs']
-        topo = self.remove_duplicates_topo(topo)
+        future_data, history_data = data['target'], data['inputs']
+        # topo = self.remove_duplicates_topo(topo)
         
         # start_time = time.time()
-        subgraphs = self.remove_duplicates_subgraphs(subgraphs)
+        # subgraphs = self.remove_duplicates_subgraphs(subgraphs)
         # end_time = time.time()
         # execution_time = end_time - start_time
         # print(f"执行时间: {execution_time:.6f} 秒")
 
-        data_name = data_name[0]
+        # data_name = data_name[0]
         history_data = self.to_running_device(history_data)  # Shape: [B, L, N, C]
         future_data = self.to_running_device(future_data)    # Shape: [B, L, N, C]
         topo = self.to_running_device(topo)
@@ -138,7 +143,6 @@ class TimeSpaceForecastingRunner(BaseTimeSeriesForecastingRunner):
             mask_strategy='causal',  
             seed=520,  
             mode='backward',  
-            patch_size=1,  
             subgraphs=subgraphs,
             **kwargs  
         )
@@ -157,3 +161,107 @@ class TimeSpaceForecastingRunner(BaseTimeSeriesForecastingRunner):
             "The shape of the output is incorrect. Ensure it matches [B, L, N, C]."
 
         return model_return
+    
+    def train(self, cfg: Dict):
+        """Train model.
+
+        Train process:
+        [init_training]
+        for in train_epoch
+            [on_epoch_start]
+            for in train iters
+                [train_iters]
+            [on_epoch_end] ------> Epoch Val: val every n epoch
+                                    [on_validating_start]
+                                    for in val iters
+                                        val iter
+                                    [on_validating_end]
+        [on_training_end]
+
+        Args:
+            cfg (Dict): config
+        """
+
+        self.init_training(cfg)
+
+        # train time predictor
+        train_time_predictor = TimePredictor(self.start_epoch, self.num_epochs)
+
+        # training loop
+        epoch_index = 0
+        for epoch_index in range(self.start_epoch, self.num_epochs):
+            # early stopping
+            if self.early_stopping_patience is not None and self.current_patience <= 0:
+                self.logger.info('Early stopping.')
+                break
+
+            epoch = epoch_index + 1
+            self.on_epoch_start(epoch)
+            epoch_start_time = time.time()
+            # start training
+            self.model.train()
+
+            # tqdm process bar
+            if cfg.get('TRAIN.DATA.DEVICE_PREFETCH', False):
+                data_loader = DevicePrefetcher(self.train_data_loader)
+            else:
+                data_loader = self.train_data_loader
+            data_loader = tqdm(data_loader) if get_local_rank() == 0 else data_loader
+
+            dataset = self.train_data_loader.dataset
+
+            # data loop
+            for iter_index, data in enumerate(data_loader):
+                loss = self.train_iters(epoch, iter_index, data, dataset.topo, dataset.data_name, dataset.subgraphs)
+                if loss is not None:
+                    self.backward(loss)
+            # update lr_scheduler
+            if self.scheduler is not None:
+                self.scheduler.step()
+
+            epoch_end_time = time.time()
+            # epoch time
+            self.update_epoch_meter('train_time', epoch_end_time - epoch_start_time)
+            self.on_epoch_end(epoch)
+
+            expected_end_time = train_time_predictor.get_expected_end_time(epoch)
+
+            # estimate training finish time
+            if epoch < self.num_epochs:
+                self.logger.info('The estimated training finish time is {}'.format(
+                    time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(expected_end_time))))
+
+        # log training finish time
+        self.logger.info('The training finished at {}'.format(
+            time.strftime('%Y-%m-%d %H:%M:%S', time.localtime())
+        ))
+
+        self.on_training_end(cfg=cfg, train_epoch=epoch_index + 1)
+
+    def train_iters(self, epoch: int, iter_index: int, data: Union[torch.Tensor, Tuple], topo, data_name, subgraphs) -> torch.Tensor:
+        """Training iteration process.
+
+        Args:
+            epoch (int): Current epoch.
+            iter_index (int): Current iteration index.
+            data (Union[torch.Tensor, Tuple]): Data provided by DataLoader.
+
+        Returns:
+            torch.Tensor: Loss value.
+        """
+
+        iter_num = (epoch - 1) * self.iter_per_epoch + iter_index
+        data = self.preprocessing(data)
+        forward_return = self.forward(data=data, topo=topo, data_name=data_name, subgraphs=subgraphs, epoch=epoch, iter_num=iter_num, train=True)
+        forward_return = self.postprocessing(forward_return)
+
+        if self.cl_param:
+            cl_length = self.curriculum_learning(epoch=epoch)
+            forward_return['prediction'] = forward_return['prediction'][:, :cl_length, :, :]
+            forward_return['target'] = forward_return['target'][:, :cl_length, :, :]
+        loss = self.metric_forward(self.loss, forward_return)
+
+        for metric_name, metric_func in self.metrics.items():
+            metric_item = self.metric_forward(metric_func, forward_return)
+            self.update_epoch_meter(f'train_{metric_name}', metric_item.item())
+        return loss

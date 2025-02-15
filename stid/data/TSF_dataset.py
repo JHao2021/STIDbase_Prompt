@@ -2,7 +2,8 @@ import json
 from typing import List
 import pickle
 import numpy as np
-
+import pymetis
+import torch
 from .base_dataset import BaseDataset
 from ..utils import load_adj
 
@@ -21,6 +22,29 @@ class TimeSpaceForecastingDataset(BaseDataset):
         data (np.ndarray): The loaded time series data array, split according to the specified mode.
         description (dict): Metadata about the dataset, such as shape and other properties.
     """
+
+
+    def graph_split(self, num_nodes, adj, patch_size):
+        '''
+        ``adjacency[i]`` needs to be an iterable of vertices adjacent to vertex i.
+        Both directions of an undirected graph edge are required to be stored.
+        '''
+
+        num = num_nodes // patch_size
+
+        n_cuts, membership = pymetis.part_graph(num, adjacency=adj)
+
+        node_split = []
+
+        for i in range(max(membership)+1):
+            node_split.append(torch.tensor(np.argwhere(np.array(membership) == i).ravel()))
+
+        node_split = [i for i in node_split if len(i) > 0]
+
+        lengths = [len(i) for i in node_split]
+        print(set(lengths))
+
+        return node_split
 
     def __init__(self, dataset_name: str, train_val_test_ratio: List[float], mode: str, input_len: int, output_len: int, overlap: bool = True) -> None:
         """
@@ -54,26 +78,35 @@ class TimeSpaceForecastingDataset(BaseDataset):
         self.adj_matrix = raw_adj_mx  
 
         ## 打印信息
-        if self.adj_matrix is not None:
-            size = self.adj_matrix.shape
-            count_greater_than_zero = np.sum(self.adj_matrix > 0)
-            print(f"Adjacency Matrix Size: {size}")
-            print(f"Number of elements greater than 0: {count_greater_than_zero}")
+        # if self.adj_matrix is not None:
+        #     size = self.adj_matrix.shape
+        #     count_greater_than_zero = np.sum(self.adj_matrix > 0)
+        #     print(f"Adjacency Matrix Size: {size}")
+        #     print(f"Number of elements greater than 0: {count_greater_than_zero}")
 
         # prompt的topo是边，不是邻接矩阵
         topo = self.adj_matrix
+
+        node_num = self.adj_matrix.shape[0]
+        adj_list = [[] for _ in range(node_num)]
         edges = []
         for i in range(topo.shape[0]):  # 使用 .shape[0] 获取行数
             for j in range(i + 1, topo.shape[1]):  # 使用 .shape[1] 获取列数
                 if topo[i, j] != 0:
                     edges.append((i, j))
-        self.topo = edges
+                    if j not in adj_list[i]:
+                        adj_list[i].append(j)
+                    if i not in adj_list[j]:
+                        adj_list[j].append(i)
 
-        node_num = self.adj_matrix.shape[0]
-        subgraphs = []
-        subgraphs.append(list(range(0, node_num))) # 所有节点一个子图
+        edges = torch.tensor(edges).long()
+        self.topo = edges
+        # subgraphs = []
+        # subgraphs.append(list(range(0, node_num))) # 所有节点一个子图
         # subgraphs.append([[i] for i in range(node_num)]) # 一个节点一个子图
-        self.subgraphs = subgraphs
+        patch_size = 4
+        self.subgraphs = self.graph_split(node_num, adj_list, patch_size)
+
 
     def _load_description(self) -> dict:
         """
@@ -141,7 +174,7 @@ class TimeSpaceForecastingDataset(BaseDataset):
         history_data = self.data[index:index + self.input_len]
         future_data = self.data[index + self.input_len:index + self.input_len + self.output_len]
 
-        return {'inputs': history_data, 'target': future_data, 'topo':self.topo, 'data_name':self.data_name,"subgraphs":self.subgraphs}
+        return {'inputs': history_data, 'target': future_data}
 
     def __len__(self) -> int:
         """
